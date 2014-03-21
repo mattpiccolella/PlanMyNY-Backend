@@ -1,5 +1,6 @@
 from flask import Flask, jsonify
 import requests, random, html2text
+from string import replace
 
 app = Flask(__name__)
 
@@ -16,14 +17,79 @@ COLUMBIA_LONG = "-73.9640299"
 NY_TIMES_API_KEY = "ac8e622d58c2753ea21809d358c146cb:9:68789349"
 NEW_YORK_TIMES_BASE_STRING = "http://api.nytimes.com/svc/events/v2/listings.json?api-key=" + NY_TIMES_API_KEY
 
+GEOCODING_BASE_STRING = "http://maps.googleapis.com/maps/api/geocode/json?address="
+
 @app.route("/")
 def hello():
     c = {}
     location = random_location()
     event = random_event(location['lat'], location['long'])
+    restaurant = random_restaurant(event)
     c['location'] = location
     c['event'] = event
+    c['restaurant'] = restaurant
     return jsonify(c)
+
+def random_restaurant(event):
+    address = event['street_address'] + ", " + event['city'] + ", " + event['state']
+    address = address.replace(" ", "+")
+    coord_query = GEOCODING_BASE_STRING + address +"&sensor=false"
+    coord_results = requests.get(coord_query).json()
+    if (len(coord_results) == 0):
+        return "ERROR"
+    location = coord_results["results"][0]
+    lat = location['geometry']['location']['lat']
+    lng = location['geometry']['location']['lng']
+    return process_restaurant(lat,lng)
+
+def process_restaurant(lat,lng):
+    query_string = GOOGLE_PLACES_BASE_STRING + str(lat) + "," + str(lng) + "&types=restaurant&key=" + GOOGLE_API_KEY + "&radius=1000&sensor=false"
+    results = requests.get(query_string).json()
+    if (len(results['results']) == 0):
+        return "ERROR"
+    rand_index = random.randint(0,len(results['results'])-1)
+    result = results['results'][rand_index]
+    name = result['name']
+    lat = result['geometry']['location']['lat']
+    lng = result['geometry']['location']['lng']
+    address = result['vicinity']
+    if 'ranking' in result:
+        ranking = result['rating']
+    else:
+        ranking = "N/A"
+    if 'photos' in result:
+        photo_reference = result['photos'][0]['photo_reference']
+    else:
+        photo_reference = "N/A"
+    reference = result['reference']
+    details_string = GOOGLE_DETAILS_BASE_STRING + reference + "&key=" + GOOGLE_API_KEY + "&sensor=false"
+    details = requests.get(details_string).json()
+    if 'result' in details:
+        detail = details['result']
+        if 'website' in detail:
+            website = detail['website']
+        else:
+            website = "N/A"
+    else:
+        website = "N/A"
+    if 'price_level' in result:
+        price = result['price_level']
+    else:
+        price = "N/A"
+    new_restaurant = {}
+    new_restaurant['name'] = name
+    new_restaurant['website'] = website
+    new_restaurant['address'] = address
+    new_restaurant['reference'] = reference
+    new_restaurant['ranking'] = ranking
+    new_restaurant['price'] = price
+    if photo_reference != "N/A":
+        photo_link = GOOGLE_PHOTO + photo_reference+ "&key=" + GOOGLE_API_KEY + "&sensor=false&maxheight=200"
+        new_restaurant['photo'] = photo_link
+    else:
+        new_restaurant['photo'] = "ERROR"
+    return new_restaurant
+        
 
 def random_location():
     url = GOOGLE_PLACES_BASE_STRING + COLUMBIA_LAT + "," + COLUMBIA_LONG + "&radius=10000&types=" + GOOGLE_ITEMS + "&sensor=false&key=" + GOOGLE_API_KEY
