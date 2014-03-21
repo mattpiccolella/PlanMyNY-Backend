@@ -20,7 +20,11 @@ NEW_YORK_TIMES_BASE_STRING = "http://api.nytimes.com/svc/events/v2/listings.json
 GEOCODING_BASE_STRING = "http://maps.googleapis.com/maps/api/geocode/json?address="
 
 @app.route("/")
-def hello():
+def home():
+    return "This is the backend API for the PlanMyNY iPhone application."
+
+@app.route("/v1.0/random_trip")
+def random_trip():
     c = {}
     location = random_location()
     event = random_event(location['lat'], location['long'])
@@ -28,7 +32,8 @@ def hello():
     c['location'] = location
     c['event'] = event
     c['restaurant'] = restaurant
-    return jsonify(c)
+    response = jsonify(c)
+    return response
 
 def random_restaurant(event):
     address = event['street_address'] + ", " + event['city'] + ", " + event['state']
