@@ -13,12 +13,26 @@ GOOGLE_PHOTO = "https://maps.googleapis.com/maps/api/place/photo?photo_reference
 COLUMBIA_LAT = "40.807001"
 COLUMBIA_LONG = "-73.9640299"
 
+NY_TIMES_API_KEY = "ac8e622d58c2753ea21809d358c146cb:9:68789349"
+NEW_YORK_TIMES_BASE_STRING = "http://api.nytimes.com/svc/events/v2/listings.json?api-key=" + NY_TIMES_API_KEY
+
 @app.route("/")
 def hello():
+    c = {}
+    location = random_location()
+    event = random_event(location['lat'], location['long'])
+    c['location'] = location
+    c['event'] = event
+    return jsonify(c)
+
+def random_location():
     url = GOOGLE_PLACES_BASE_STRING + COLUMBIA_LAT + "," + COLUMBIA_LONG + "&radius=10000&types=" + GOOGLE_ITEMS + "&sensor=false&key=" + GOOGLE_API_KEY
     response_dict = requests.get(url).json()
     random_index = random.randint(0,len(response_dict['results']) - 1)
     random_item = response_dict['results'][random_index]
+    return process_location(random_item)
+
+def process_location(random_item):
     c = {}
     c['lat'] = random_item['geometry']['location']['lat']
     c['long'] = random_item['geometry']['location']['lng']
@@ -27,11 +41,44 @@ def hello():
     c['address'] = random_item['vicinity']
     if 'photos' in random_item:
         photo_ref = random_item['photos'][0]['photo_reference']
-        photo_link = GOOGLE_PHOTO + photo_ref + "&senser=false&key=" + GOOGLE_API_KEY + "&maxheight=300"
+        photo_link = GOOGLE_PHOTO + photo_ref + "&sensor=false&key=" + GOOGLE_API_KEY + "&maxheight=300"
     else:
         photo_link = "N/A"
     c['photo'] = photo_link
-    return jsonify(c)
+    return c
+
+def random_event(lat,lng):
+    url = NEW_YORK_TIMES_BASE_STRING + "&ll=" + lat + "," + lng + "&radius=1000&limit=10"
+    event_results = requests.get(url).json
+    #random_index = random.randint(0,len(event_results['results']) - 1)
+    #random_item = event_results['results'][random_index]
+    return event_results
+
+
+def process_event(result):
+    event = {}
+    event['id'] = result['event_id']
+    event['name'] = result['event_name']
+    event['link'] = result['event_detail_url']
+    if "venue_name" in result:
+        event['location'] = result['venue_name']
+    else:
+        event['location'] = "N/A"
+    description = result['web_description']
+    event['description'] = description
+    if 'telephone' in result:
+        event['phone_number'] = result['telephone']
+    else:
+        event['phone_number'] = "N/A"
+    event['street_address'] = result['street_address']
+    event['city'] = result['city']
+    event['state'] = result['state']
+    if 'postal_code' in result:
+        event['postal_code'] = result['postal_code']
+    else:
+        event['postal_code'] = "N/A"
+    return event
+    
 
 if __name__ == "__main__":
     app.debug = True
