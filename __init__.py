@@ -1,5 +1,5 @@
 from flask import Flask, jsonify
-import requests, random
+import requests, random, html2text
 
 app = Flask(__name__)
 
@@ -48,37 +48,52 @@ def process_location(random_item):
     return c
 
 def random_event(lat,lng):
-    url = NEW_YORK_TIMES_BASE_STRING + "&ll=" + lat + "," + lng + "&radius=1000&limit=10"
-    event_results = requests.get(url).json
-    #random_index = random.randint(0,len(event_results['results']) - 1)
-    #random_item = event_results['results'][random_index]
-    return event_results
+    url = NEW_YORK_TIMES_BASE_STRING + "&ll=" + str(lat) + "," + str(lng) + "&radius=1000&limit=10"
+    event_results = requests.get(url).json()
+    if len(event_results['results']) == 0:
+        return process_event(event_results, True)
+    random_index = random.randint(0,len(event_results['results']) - 1)
+    random_item = event_results['results'][random_index]
+    return process_event(random_item, False)
 
 
-def process_event(result):
-    event = {}
-    event['id'] = result['event_id']
-    event['name'] = result['event_name']
-    event['link'] = result['event_detail_url']
-    if "venue_name" in result:
-        event['location'] = result['venue_name']
+def process_event(result, filler):
+    if (filler == False):
+        event = {}
+        event['id'] = result['event_id']
+        event['name'] = result['event_name']
+        event['link'] = result['event_detail_url']
+        if "venue_name" in result:
+            event['location'] = result['venue_name']
+        else:
+            event['location'] = "N/A"
+        description = html2text.html2text(result['web_description'])
+        event['description'] = description
+        if 'telephone' in result:
+            event['phone_number'] = result['telephone']
+        else:
+            event['phone_number'] = "N/A"
+        event['street_address'] = result['street_address']
+        event['city'] = result['city']
+        event['state'] = result['state']
+        if 'postal_code' in result:
+            event['postal_code'] = result['postal_code']
+        else:
+            event['postal_code'] = "N/A"
+        return event
     else:
-        event['location'] = "N/A"
-    description = result['web_description']
-    event['description'] = description
-    if 'telephone' in result:
-        event['phone_number'] = result['telephone']
-    else:
-        event['phone_number'] = "N/A"
-    event['street_address'] = result['street_address']
-    event['city'] = result['city']
-    event['state'] = result['state']
-    if 'postal_code' in result:
-        event['postal_code'] = result['postal_code']
-    else:
-        event['postal_code'] = "N/A"
-    return event
-    
+        event = {}
+        event['id'] = "id"
+        event['name'] = "name"
+        event['link'] = "link"
+        event['location'] = "location"
+        event['description'] = "description"
+        event['phone_number'] = "phone_number"
+        event['street_address'] = "street_address"
+        event['city'] = "city"
+        event['state'] = "state"
+        event['postal_code'] = "postal_code"
+        return event
 
 if __name__ == "__main__":
     app.debug = True
