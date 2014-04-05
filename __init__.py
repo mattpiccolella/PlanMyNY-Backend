@@ -4,6 +4,38 @@ from string import replace
 
 app = Flask(__name__)
 
+ORDR_IN_BASE_STRING = "https://r-test.ordr.in/"
+ORDR_IN_SECRET = "mt5rsSaIPd7SZDqjKg8rNSTTJ9LhKOCnm1c8nbGn_VY"
+ORDR_IN_AUTH = "/?_auth=1," + ORDR_IN_SECRET
+
+@app.route("/v1.0/random_restaurant/<street_address>/<city>/<zip_code>/")
+def random_order(street_address,city,zip_code):
+    menu_response = random_menu(street_address,city,zip_code)
+    x = 0
+    while (True):
+        random_item = menu_response['menu'][random.randint(0,len(menu_response['menu']) - 1)]
+        random_sub_item = random_item['children'][random.randint(0,len(random_item['children'])-1)]
+        price = float(random_sub_item['price'])
+        if ((price > 5 and price < 10) and random_sub_item['is_orderable'] == "1" and not ('children' in random_sub_item)):
+            return jsonify(random_sub_item)
+        else:
+            x = x + 1
+        if (x % 100 == 0):
+            menu_response = random_menu(street_address,city,zip_code)
+        if (x > 10000):
+            break
+    return jsonify(selected_restaurant)
+
+def random_menu(street_address,city,zip_code):
+    restaurant_url = ORDR_IN_BASE_STRING + "dl/ASAP" + "/" + str(zip_code) + "/" + city + "/" + street_address + ORDR_IN_AUTH
+    restaurant_url = restaurant_url.replace(" ", "%20")
+    response = requests.get(restaurant_url).json()
+    random_index = random.randint(0,len(response) - 1)
+    selected_restaurant = response[random_index]
+    menu_url = ORDR_IN_BASE_STRING + "/rd/" + str(selected_restaurant['id']) + ORDR_IN_AUTH
+    menu_response = requests.get(menu_url).json()
+    return menu_response
+
 GOOGLE_API_KEY = "AIzaSyDhoZ2Yyii_wvZaWSqUu4BilsVAfJHZIzk"
 GOOGLE_PLACES_BASE_STRING = "https://maps.googleapis.com/maps/api/place/nearbysearch/json?location="
 GOOGLE_DETAILS_BASE_STRING = "https://maps.googleapis.com/maps/api/place/details/json?reference="
