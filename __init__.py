@@ -8,23 +8,58 @@ ORDR_IN_BASE_STRING = "https://r-test.ordr.in/"
 ORDR_IN_SECRET = "mt5rsSaIPd7SZDqjKg8rNSTTJ9LhKOCnm1c8nbGn_VY"
 ORDR_IN_AUTH = "/?_auth=1," + ORDR_IN_SECRET
 
-@app.route("/v1.0/random_restaurant/<street_address>/<city>/<zip_code>/")
-def random_order(street_address,city,zip_code):
+@app.route("/v1.0/random_restaurant/<street_address>/<city>/<zip_code>/<price>")
+def place_order(street_address,city,zip_code,price):
+    this_item = random_item(street_address,city,zip_code,price)
+    if 'failed' in this_item:
+        c = {}
+        c['failed'] = True
+        return jsonify(c)
+    else:
+        c = {}
+        if 'descrip' in this_item['item']:
+            c['description'] = this_item['item']['descrip']
+        if 'price' in this_item['item']:
+            c['price'] = this_item['item']['price']
+        if 'name' in this_item['item']:
+            c['name'] = this_item['item']['name']
+        if 'na' in this_item['restaurant']:
+            c['restaurant'] = this_item['restaurant']['na']
+        if 'cu' in this_item['restaurant']:
+            c['types'] = this_item['restaurant']['cu']
+        if 'addr' in this_item['restaurant']:
+            c['address'] = this_item['restaurant']['addr']
+        return jsonify(c)
+
+def random_item(street_address,city,zip_code, price):
     menu_response = random_menu(street_address,city,zip_code)
     x = 0
+    lower_bound = float(price) * .8
+    upper_bound = float(price) * 1.2
+    ordered = False
     while (True):
-        random_item = menu_response['menu'][random.randint(0,len(menu_response['menu']) - 1)]
-        random_sub_item = random_item['children'][random.randint(0,len(random_item['children'])-1)]
-        price = float(random_sub_item['price'])
-        if ((price > 5 and price < 10) and random_sub_item['is_orderable'] == "1" and not ('children' in random_sub_item)):
-            return jsonify(random_sub_item)
+        random_item = menu_response['menu_response']['menu'][random.randint(0,len(menu_response['menu_response']['menu']) - 1)]
+        if 'children' in random_item:
+            random_sub_item = random_item['children'][random.randint(0,len(random_item['children'])-1)]
+            price = float(random_sub_item['price'])
+            if ((price > lower_bound and price < upper_bound) and random_sub_item['is_orderable'] == "1" and not ('children' in random_sub_item)):
+                c = {}
+                c['item'] = random_sub_item
+                c['restaurant'] = menu_response['restaurant']
+                return c
+            else:
+                x = x + 1
+                if (x % 100 == 0):
+                    menu_response = random_menu(street_address,city,zip_code)
+                    if (x > 500000):
+                        break
         else:
-            x = x + 1
-        if (x % 100 == 0):
-            menu_response = random_menu(street_address,city,zip_code)
-        if (x > 10000):
-            break
-    return jsonify(selected_restaurant)
+            x = x+1
+            if (x > 500000):
+                break
+    c = {}
+    c['failed'] = True
+    return c
 
 def random_menu(street_address,city,zip_code):
     restaurant_url = ORDR_IN_BASE_STRING + "dl/ASAP" + "/" + str(zip_code) + "/" + city + "/" + street_address + ORDR_IN_AUTH
@@ -34,7 +69,10 @@ def random_menu(street_address,city,zip_code):
     selected_restaurant = response[random_index]
     menu_url = ORDR_IN_BASE_STRING + "/rd/" + str(selected_restaurant['id']) + ORDR_IN_AUTH
     menu_response = requests.get(menu_url).json()
-    return menu_response
+    c = {}
+    c['restaurant'] = selected_restaurant
+    c['menu_response'] = menu_response
+    return c
 
 GOOGLE_API_KEY = "AIzaSyDhoZ2Yyii_wvZaWSqUu4BilsVAfJHZIzk"
 GOOGLE_PLACES_BASE_STRING = "https://maps.googleapis.com/maps/api/place/nearbysearch/json?location="
